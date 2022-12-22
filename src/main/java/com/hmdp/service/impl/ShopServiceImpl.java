@@ -9,6 +9,7 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
+import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisData;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private CacheClient cacheClient;
+
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
     @Override
@@ -44,10 +48,19 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         //Shop shop = queryWithPassThrough(id);
 
         //互斥锁解决缓存击穿
-        Shop shop = queryWithMutex(id);
+        //Shop shop = queryWithMutex(id);
 
         //逻辑过期解决缓存击穿问题
         //Shop shop = queryWithLogicalExpire(id);
+
+        //工具类:解决缓存穿透
+        //Shop shop = cacheClient
+        //       .queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class,
+        //                this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        //工具类:互斥锁解决缓存击穿
+        Shop shop = cacheClient
+                .queryWithMutex(CACHE_SHOP_KEY,LOCK_SHOP_KEY, id, Shop.class,
+                        this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
         if (shop == null) {
             return Result.fail("店铺不存在");
         }
@@ -108,7 +121,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     public Shop queryWithMutex(Long id) {
         String key = CACHE_SHOP_KEY + id;
         // 1、从redis中查询商铺缓存
-        String shopJson = stringRedisTemplate.opsForValue().get("key");
+        String shopJson = stringRedisTemplate.opsForValue().get(key);
         // 2、判断是否存在
         if (StrUtil.isNotBlank(shopJson)) {
             // 存在,直接返回
