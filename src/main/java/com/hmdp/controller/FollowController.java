@@ -28,9 +28,16 @@ public class FollowController {
     public Result follow(@PathVariable("id") Long followUserId, @PathVariable("isFollow") Boolean isFollow) {
         return followService.follow(followUserId, isFollow);
     }
+
     //取消关注
     @GetMapping("/or/not/{id}")
     public Result isFollow(@PathVariable("id") Long followUserId) {
         return followService.isFollow(followUserId);
+    }
+
+    //共同关注
+    @GetMapping("/common/{id}")
+    public Result common(@PathVariable("id") Long followUserId) {
+        return followService.followCommons(followUserId);
     }
 }
